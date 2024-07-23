@@ -3,13 +3,16 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_cluster_manager/google_maps_cluster_manager.dart';
 
 class DistanceBasedClustering<T extends ClusterItem> {
-  final double thresholdDistance;
+  final List<double> distanceThresholds;
+  final List<double> levels;
 
   DistanceBasedClustering({
-    required this.thresholdDistance,
+    required this.distanceThresholds,
+    required this.levels,
   });
 
-  List<Cluster<T>> cluster(List<T> items) {
+  List<Cluster<T>> cluster(List<T> items, double zoom) {
+    double thresholdDistance = _getThresholdDistance(zoom);
     List<Cluster<T>> clusters = [];
     Set<T> unvisitedItems = items.toSet();
 
@@ -29,6 +32,15 @@ class DistanceBasedClustering<T extends ClusterItem> {
     }
 
     return clusters;
+  }
+
+  double _getThresholdDistance(double zoom) {
+    for (int i = levels.length - 1; i >= 0; i--) {
+      if (zoom >= levels[i]) {
+        return distanceThresholds[i];
+      }
+    }
+    return distanceThresholds.first; // Fallback to the first threshold if no match
   }
 
   double _distanceBetween(LatLng start, LatLng end) {

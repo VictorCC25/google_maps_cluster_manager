@@ -9,33 +9,21 @@ import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platf
 import 'package:google_maps_cluster_manager/src/distance_based_clustering.dart';
 import 'package:google_maps_cluster_manager/src/k_clustering.dart';
 
-enum ClusterAlgorithm { GEOHASH, MAX_DIST, DISTANCE_BASED, K_MEANS }
-
-class MaxDistParams {
-  final double epsilon;
-
-  MaxDistParams(this.epsilon);
-}
+enum ClusterAlgorithm { DISTANCE_BASED }
 
 class ClusterManager<T extends ClusterItem> {
   ClusterManager(this._items, this.updateMarkers,
       {Future<Marker> Function(Cluster<T>)? markerBuilder,
       this.levels = const [1, 4.25, 6.75, 8.25, 11.5, 14.5, 16.0, 16.5, 20.0],
       this.extraPercent = 0.5,
-      this.maxItemsForMaxDistAlgo = 200,
-      this.clusterAlgorithm = ClusterAlgorithm.GEOHASH,
-      this.maxDistParams,
-      this.distanceThreshold,
-      this.k,
+      required this.distanceThresholds,
       this.stopClusteringZoom})
       : this.markerBuilder = markerBuilder ?? _basicMarkerBuilder,
-        assert(levels.length <= precision);
+        assert(levels.length == distanceThresholds.length,
+            'The levels and distanceThresholds lists must have the same length.');
 
   /// Method to build markers
   final Future<Marker> Function(Cluster<T>) markerBuilder;
-
-  // Num of Items to switch from MAX_DIST algo to GEOHASH
-  final int maxItemsForMaxDistAlgo;
 
   /// Function to update Markers on Google Map
   final void Function(Set<Marker>) updateMarkers;
@@ -46,12 +34,8 @@ class ClusterManager<T extends ClusterItem> {
   /// Extra percent of markers to be loaded (ex : 0.2 for 20%)
   final double extraPercent;
 
-  // Clustering algorithm
-  final ClusterAlgorithm clusterAlgorithm;
-
-  final MaxDistParams? maxDistParams;
-  final double? distanceThreshold;
-  final int? k;
+  /// List of distance thresholds for each zoom level
+  final List<double> distanceThresholds;
 
   /// Zoom level to stop cluster rendering
   final double? stopClusteringZoom;
@@ -122,11 +106,7 @@ class ClusterManager<T extends ClusterItem> {
     if (mapBounds == null) return List.empty();
 
     late LatLngBounds inflatedBounds;
-    if (clusterAlgorithm == ClusterAlgorithm.GEOHASH) {
-      inflatedBounds = _inflateBounds(mapBounds);
-    } else {
-      inflatedBounds = mapBounds;
-    }
+    inflatedBounds = mapBounds;
 
     List<T> visibleItems = items.where((i) {
       return inflatedBounds.contains(i.location);
@@ -137,19 +117,10 @@ class ClusterManager<T extends ClusterItem> {
 
     List<Cluster<T>> markers;
 
-    if (clusterAlgorithm == ClusterAlgorithm.GEOHASH ||
-        visibleItems.length >= maxItemsForMaxDistAlgo) {
-      int level = _findLevel(levels);
-      markers = _computeClusters(visibleItems, List.empty(growable: true),
-          level: level);
-    } else if (clusterAlgorithm == ClusterAlgorithm.DISTANCE_BASED) {
-      markers = DistanceBasedClustering<T>(thresholdDistance: distanceThreshold!)
-          .cluster(visibleItems);
-    } else if (clusterAlgorithm == ClusterAlgorithm.K_MEANS) {
-      markers = KMeansClustering<T>(k: k!).cluster(visibleItems);
-    } else {
-      markers = _computeClustersWithMaxDist(visibleItems, _zoom);
-    }
+    markers = DistanceBasedClustering<T>(
+      distanceThresholds: distanceThresholds,
+      levels: levels,
+    ).cluster(visibleItems, _zoom);
 
     return markers;
   }
@@ -198,33 +169,6 @@ class ClusterManager<T extends ClusterItem> {
     }
 
     return 1;
-  }
-
-  List<Cluster<T>> _computeClustersWithMaxDist(
-      List<T> inputItems, double zoom) {
-    MaxDistClustering<T> scanner = MaxDistClustering(
-      epsilon: maxDistParams?.epsilon ?? 20,
-    );
-
-    return scanner.run(inputItems, _getZoomLevel(zoom));
-  }
-
-  List<Cluster<T>> _computeClusters(
-      List<T> inputItems, List<Cluster<T>> markerItems,
-      {int level = 5}) {
-    if (inputItems.isEmpty) return markerItems;
-    String nextGeohash = inputItems[0].geohash.substring(0, level);
-
-    List<T> items = inputItems
-        .where((p) => p.geohash.substring(0, level) == nextGeohash)
-        .toList();
-
-    markerItems.add(Cluster<T>.fromItems(items));
-
-    List<T> newInputList = List.from(
-        inputItems.where((i) => i.geohash.substring(0, level) != nextGeohash));
-
-    return _computeClusters(newInputList, markerItems, level: level);
   }
 
   static Future<Marker> Function(Cluster) get _basicMarkerBuilder =>
