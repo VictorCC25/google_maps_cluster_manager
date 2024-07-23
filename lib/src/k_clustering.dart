@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:flutter_google_maps_cluster_manager/flutter_google_maps_cluster_manager.dart';
+import 'package:google_maps_cluster_manager/google_maps_cluster_manager.dart';
 
 class KMeansClustering extends ClusterAlgorithm {
   final int k;
