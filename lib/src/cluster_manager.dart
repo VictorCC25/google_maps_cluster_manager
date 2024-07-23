@@ -116,8 +116,10 @@ class ClusterManager<T extends ClusterItem> {
   Future<List<Cluster<T>>> getMarkers() async {
     if (_mapId == null) return List.empty();
 
-    final LatLngBounds mapBounds = await GoogleMapsFlutterPlatform.instance
+    final LatLngBounds? mapBounds = await GoogleMapsFlutterPlatform.instance
         .getVisibleRegion(mapId: _mapId!);
+
+    if (mapBounds == null) return List.empty();
 
     late LatLngBounds inflatedBounds;
     if (clusterAlgorithm == ClusterAlgorithm.GEOHASH) {
@@ -164,7 +166,7 @@ class ClusterManager<T extends ClusterItem> {
           (bounds.northeast.longitude - bounds.southwest.longitude);
     }
 
-    // Latitudes expanded beyond +/- 90 are automatically clamped by LatLng
+    // Latitudes expanded beyond +/- 90 are automáticamente clamped by LatLng
     double lat =
         extraPercent * (bounds.northeast.latitude - bounds.southwest.latitude);
 
