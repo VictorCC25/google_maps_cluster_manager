@@ -2,37 +2,27 @@ import 'dart:math';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_cluster_manager/google_maps_cluster_manager.dart';
 
-class KMeansClustering extends ClusterAlgorithm {
+class KMeansClustering<T extends ClusterItem> {
   final int k;
 
   KMeansClustering({
     required this.k,
   });
 
-  @override
-  void cluster(List<ClusterItem> items, Function(Set<Marker>) updateMarkers, Marker Function(Cluster) markerBuilder) {
-    List<Cluster> clusters = _kMeans(items, k);
-
-    Set<Marker> markers = clusters.map((cluster) => markerBuilder(cluster)).toSet();
-    updateMarkers(markers);
-  }
-
-  List<Cluster> _kMeans(List<ClusterItem> items, int k) {
+  List<Cluster<T>> cluster(List<T> items) {
     List<LatLng> centroids = _initializeCentroids(items, k);
-    Map<int, List<ClusterItem>> clusterMap = {};
+    Map<int, List<T>> clusterMap = {};
 
     bool centroidsChanged;
     do {
       centroidsChanged = false;
 
-      // Asignar cada item al cluster más cercano
       clusterMap = {for (int i = 0; i < k; i++) i: []};
       for (var item in items) {
         int closestCentroidIndex = _findClosestCentroid(item.location, centroids);
         clusterMap[closestCentroidIndex]!.add(item);
       }
 
-      // Recalcular los centroides
       for (int i = 0; i < k; i++) {
         if (clusterMap[i]!.isNotEmpty) {
           LatLng newCentroid = _calculateCentroid(clusterMap[i]!);
@@ -44,10 +34,10 @@ class KMeansClustering extends ClusterAlgorithm {
       }
     } while (centroidsChanged);
 
-    return clusterMap.values.map((items) => Cluster(items)).toList();
+    return clusterMap.values.map((items) => Cluster<T>.fromItems(items)).toList();
   }
 
-  List<LatLng> _initializeCentroids(List<ClusterItem> items, int k) {
+  List<LatLng> _initializeCentroids(List<T> items, int k) {
     items.shuffle();
     return items.take(k).map((item) => item.location).toList();
   }
@@ -67,7 +57,7 @@ class KMeansClustering extends ClusterAlgorithm {
     return closestIndex;
   }
 
-  LatLng _calculateCentroid(List<ClusterItem> items) {
+  LatLng _calculateCentroid(List<T> items) {
     double latSum = 0;
     double lngSum = 0;
     for (var item in items) {

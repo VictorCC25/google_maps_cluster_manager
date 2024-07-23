@@ -2,35 +2,33 @@ import 'dart:math';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_cluster_manager/google_maps_cluster_manager.dart';
 
-class DistanceBasedClustering extends ClusterAlgorithm {
-  final double thresholdDistance; // en metros
+class DistanceBasedClustering<T extends ClusterItem> {
+  final double thresholdDistance;
 
   DistanceBasedClustering({
     required this.thresholdDistance,
   });
 
-  @override
-  void cluster(List<ClusterItem> items, Function(Set<Marker>) updateMarkers, Marker Function(Cluster) markerBuilder) {
-    List<Cluster> clusters = [];
-    Set<ClusterItem> unvisitedItems = items.toSet();
+  List<Cluster<T>> cluster(List<T> items) {
+    List<Cluster<T>> clusters = [];
+    Set<T> unvisitedItems = items.toSet();
 
     while (unvisitedItems.isNotEmpty) {
-      ClusterItem item = unvisitedItems.first;
+      T item = unvisitedItems.first;
       unvisitedItems.remove(item);
 
-      List<ClusterItem> clusterItems = [item];
-      for (ClusterItem otherItem in unvisitedItems.toList()) {
+      List<T> clusterItems = [item];
+      for (T otherItem in unvisitedItems.toList()) {
         if (_distanceBetween(item.location, otherItem.location) < thresholdDistance) {
           clusterItems.add(otherItem);
           unvisitedItems.remove(otherItem);
         }
       }
 
-      clusters.add(Cluster(clusterItems));
+      clusters.add(Cluster<T>.fromItems(clusterItems));
     }
 
-    Set<Marker> markers = clusters.map((cluster) => markerBuilder(cluster)).toSet();
-    updateMarkers(markers);
+    return clusters;
   }
 
   double _distanceBetween(LatLng start, LatLng end) {
